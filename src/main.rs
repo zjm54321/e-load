@@ -10,11 +10,14 @@ use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch
 
 use cortex_m_rt::entry;
 
-#[cfg(feature= "semihosting")]
+#[cfg(feature = "semihosting")]
 use cortex_m_semihosting::hprintln;
 
 use stm32f1xx_hal::{
-    self, i2c::{BlockingI2c, DutyCycle, Mode}, pac::{self}, prelude::*
+    self,
+    i2c::{BlockingI2c, DutyCycle, Mode},
+    pac::{self},
+    prelude::*,
 };
 
 use bitbang_hal::i2c::I2cBB;
@@ -78,7 +81,10 @@ fn main() -> ! {
     screen.init().ok();
     led.set_low(); //屏幕加载完毕
     screen.clear().ok();
+
+    #[cfg(debug_assertions)]
     write!(screen, "Screen Init Finished.\n").ok();
+
     #[cfg(feature = "semihosting")]
     hprintln!("ssd1306 init finished");
 
@@ -99,10 +105,15 @@ fn main() -> ! {
         1000,
         1000,
     );
+
+    #[cfg(debug_assertions)]
     write!(screen, "Dac_i2c init finished.\n").ok();
 
     let mut dac = MCP4725::new(dac_i2c, 0b000);
+
+    #[cfg(debug_assertions)]
     write!(screen, "Dac init finished.\n").ok();
+    
     dac.set_dac_and_eeprom(PowerDown::Normal, 0x0000).ok();
 
     // 设置ina226，使用硬件i2c (pb10,pb11)
@@ -135,6 +146,8 @@ fn main() -> ! {
         })
         .ok();
     ina226.callibrate(0.01, 2.5).ok();
+
+    #[cfg(debug_assertions)]
     write!(screen, "Ina226 init finished.\n").ok();
     */
 
@@ -146,11 +159,12 @@ fn main() -> ! {
         gpiob.pb14.into_pull_up_input(&mut gpiob.crh),
         gpiob.pb15.into_pull_up_input(&mut gpiob.crh),
     );
+
+    #[cfg(debug_assertions)]
     write!(screen, "Key init finished.\n").ok();
 
-    
     //相关代码
-    const  VREF: VoltageReference = VoltageReference {
+    const VREF: VoltageReference = VoltageReference {
         v15: [
             0x0000, 0x000f, 0x00f0, 0x00ff, 0x0f00, 0x0f0f, 0x0ff0, 0x0fff, 0xf000, 0xf00f,
         ],
@@ -164,7 +178,9 @@ fn main() -> ! {
     screen.clear().ok();
 
     loop {
-        write!(screen,"still loop\n").ok();
+        #[cfg(debug_assertions)]
+        write!(screen, "still loop\n").ok();
+
         if col1.is_low() {
             delay.delay_ms(20_u16);
             while col1.is_low() {}
@@ -174,7 +190,7 @@ fn main() -> ! {
             } else {
                 voltage_mode = 0;
             }
-            write!(screen, "voltage mode is {}\n", voltage_mode).ok();
+            write!(screen, "v mode is {}\n", voltage_mode).ok();
         }
         if col2.is_low() {
             delay.delay_ms(20_u16);
@@ -185,7 +201,7 @@ fn main() -> ! {
             } else {
                 current_mode = 0;
             }
-            write!(screen, "current mode is {}\n", current_mode).ok();
+            write!(screen, "c mode is {}\n", current_mode).ok();
         }
         if col3.is_low() {
             delay.delay_ms(20_u16);
@@ -197,34 +213,33 @@ fn main() -> ! {
             while col4.is_low() {}
             delay.delay_ms(20_u16);
         }
-        
+
         match (voltage_mode, current_mode) {
             (0, _) => {
                 dac.set_dac_fast(PowerDown::Normal, 0x0000).ok();
             }
             (1, i) => {
                 #[cfg(feature = "semihosting")]
-                hprintln!("{}",VREF.v15[i]);
+                hprintln!("{}", VREF.v15[i]);
                 dac.set_dac_fast(PowerDown::Normal, VREF.v15[i]).ok();
             }
             (2, i) => {
                 #[cfg(feature = "semihosting")]
-                hprintln!("{}",VREF.v10[i]);
+                hprintln!("{}", VREF.v10[i]);
                 dac.set_dac_fast(PowerDown::Normal, VREF.v10[i]).ok();
             }
             (3, i) => {
                 #[cfg(feature = "semihosting")]
-                hprintln!("{}",VREF.v5[i]);
+                hprintln!("{}", VREF.v5[i]);
                 dac.set_dac_fast(PowerDown::Normal, VREF.v5[i]).ok();
             }
             (4, i) => {
                 #[cfg(feature = "semihosting")]
-                hprintln!("{}",VREF.v1[i]);
+                hprintln!("{}", VREF.v1[i]);
                 dac.set_dac_fast(PowerDown::Normal, VREF.v1[i]).ok();
             }
             (_, _) => {}
         }
-    
     }
 }
 
