@@ -22,9 +22,8 @@ use stm32f1xx_hal::{
 
 use bitbang_hal::i2c::I2cBB;
 use embedded_graphics::{
-    image::Image,
     mono_font::{MonoTextStyleBuilder, ascii::FONT_6X10, iso_8859_13::FONT_10X20},
-    pixelcolor::{BinaryColor, Rgb888},
+    pixelcolor::BinaryColor,
     prelude::*,
     primitives::{Line, PrimitiveStyle},
     text::{Baseline, Text},
@@ -183,10 +182,10 @@ fn main() -> ! {
 
     //相关代码
     const VREF: VoltageReference = VoltageReference {
-        v15: [0xffff, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        v10: [0; 10],
-        v5: [0x01a3, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        v1: [0; 10],
+        v15: [0x01a3, 0x0331, 0x04a7, 0x0636, 0x07b0, 0x0935, 0x0a9e, 0x0c47, 0x0df6, 0x0f49],
+        v10: [0x01a3, 0x0331, 0x04a7, 0x0636, 0x07b0, 0x0935, 0x0a9e, 0x0c47, 0x0df6, 0x0f49],
+        v5: [0x01a3, 0x0331, 0x04a7, 0x0636, 0x07b0, 0x0935, 0x0a9e, 0x0c47, 0x0df6, 0x0f49],
+        v1: [0x01a3, 0x0331, 0x04a7, 0x0636, 0x07b0, 0x0935, 0x0a9e, 0x0c47, 0x0df6, 0x0f49],
     };
     let mut voltage_mode: u8 = 0;
     let mut current_mode: usize = 0;
