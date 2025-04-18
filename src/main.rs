@@ -21,7 +21,14 @@ use stm32f1xx_hal::{
 };
 
 use bitbang_hal::i2c::I2cBB;
-use core::fmt::Write;
+use embedded_graphics::{
+    image::Image,
+    mono_font::{MonoTextStyleBuilder, ascii::FONT_6X10, iso_8859_13::FONT_10X20},
+    pixelcolor::{BinaryColor, Rgb888},
+    prelude::*,
+    primitives::{Line, PrimitiveStyle},
+    text::{Baseline, Text},
+};
 use ssd1306::{
     I2CDisplayInterface, Ssd1306, mode::DisplayConfig, prelude::DisplayRotation,
     size::DisplaySize128x64,
@@ -77,13 +84,24 @@ fn main() -> ! {
         DisplaySize128x64,
         DisplayRotation::Rotate0,
     )
-    .into_terminal_mode();
+    .into_buffered_graphics_mode();
     screen.init().ok();
     led.set_low(); //屏幕加载完毕
-    screen.clear().ok();
 
-    #[cfg(debug_assertions)]
-    write!(screen, "Screen Init Finished.\n").ok();
+    let big_text = MonoTextStyleBuilder::new()
+        .font(&FONT_10X20)
+        .text_color(BinaryColor::On)
+        .build();
+
+    let text = MonoTextStyleBuilder::new()
+        .font(&FONT_6X10)
+        .text_color(BinaryColor::On)
+        .build();
+
+    Text::with_baseline(".", Point::new(0, 0), big_text, Baseline::Top)
+        .draw(&mut screen)
+        .ok();
+    screen.flush().ok();
 
     #[cfg(feature = "semihosting")]
     hprintln!("ssd1306 init finished");
@@ -106,14 +124,13 @@ fn main() -> ! {
         1000,
     );
 
-    #[cfg(debug_assertions)]
-    write!(screen, "Dac_i2c init finished.\n").ok();
-
     let mut dac = MCP4725::new(dac_i2c, 0b000);
 
-    #[cfg(debug_assertions)]
-    write!(screen, "Dac init finished.\n").ok();
-    
+    Text::with_baseline(".", Point::new(10, 0), big_text, Baseline::Top)
+        .draw(&mut screen)
+        .ok();
+    screen.flush().ok();
+
     dac.set_dac_and_eeprom(PowerDown::Normal, 0x0000).ok();
 
     // 设置ina226，使用硬件i2c (pb10,pb11)
@@ -147,8 +164,6 @@ fn main() -> ! {
         .ok();
     ina226.callibrate(0.01, 2.5).ok();
 
-    #[cfg(debug_assertions)]
-    write!(screen, "Ina226 init finished.\n").ok();
     */
 
     //按键启用
@@ -160,27 +175,31 @@ fn main() -> ! {
         gpiob.pb15.into_pull_up_input(&mut gpiob.crh),
     );
 
-    #[cfg(debug_assertions)]
-    write!(screen, "Key init finished.\n").ok();
+    Text::with_baseline(".", Point::new(12, 0), big_text, Baseline::Top)
+        .draw(&mut screen)
+        .ok();
+    screen.flush().ok();
+    screen.clear_buffer();
 
     //相关代码
     const VREF: VoltageReference = VoltageReference {
-        v15: [
-            0x0000, 0x000f, 0x00f0, 0x00ff, 0x0f00, 0x0f0f, 0x0ff0, 0x0fff, 0xf000, 0xf00f,
-        ],
+        v15: [0xffff, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         v10: [0; 10],
-        v5: [0; 10],
+        v5: [0x01a3, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         v1: [0; 10],
     };
     let mut voltage_mode: u8 = 0;
-    let mut current_mode = 0;
+    let mut current_mode: usize = 0;
+    let mut dac_data: Option<u16>;
 
-    screen.clear().ok();
+    Text::with_baseline("Booted!", Point::new(0, 0), big_text, Baseline::Top)
+        .draw(&mut screen)
+        .ok();
+    screen.flush().ok();
+    screen.clear_buffer();
+    delay.delay(1.secs());
 
     loop {
-        #[cfg(debug_assertions)]
-        write!(screen, "still loop\n").ok();
-
         if col1.is_low() {
             delay.delay_ms(20_u16);
             while col1.is_low() {}
@@ -190,7 +209,6 @@ fn main() -> ! {
             } else {
                 voltage_mode = 0;
             }
-            write!(screen, "v mode is {}\n", voltage_mode).ok();
         }
         if col2.is_low() {
             delay.delay_ms(20_u16);
@@ -201,7 +219,6 @@ fn main() -> ! {
             } else {
                 current_mode = 0;
             }
-            write!(screen, "c mode is {}\n", current_mode).ok();
         }
         if col3.is_low() {
             delay.delay_ms(20_u16);
@@ -215,31 +232,20 @@ fn main() -> ! {
         }
 
         match (voltage_mode, current_mode) {
-            (0, _) => {
-                dac.set_dac_fast(PowerDown::Normal, 0x0000).ok();
-            }
-            (1, i) => {
-                #[cfg(feature = "semihosting")]
-                hprintln!("{}", VREF.v15[i]);
-                dac.set_dac_fast(PowerDown::Normal, VREF.v15[i]).ok();
-            }
-            (2, i) => {
-                #[cfg(feature = "semihosting")]
-                hprintln!("{}", VREF.v10[i]);
-                dac.set_dac_fast(PowerDown::Normal, VREF.v10[i]).ok();
-            }
-            (3, i) => {
-                #[cfg(feature = "semihosting")]
-                hprintln!("{}", VREF.v5[i]);
-                dac.set_dac_fast(PowerDown::Normal, VREF.v5[i]).ok();
-            }
-            (4, i) => {
-                #[cfg(feature = "semihosting")]
-                hprintln!("{}", VREF.v1[i]);
-                dac.set_dac_fast(PowerDown::Normal, VREF.v1[i]).ok();
-            }
-            (_, _) => {}
+            (0, _) => dac_data = None,
+            (_, 0) => dac_data = None,
+            (1, i) => dac_data = Some(VREF.v1[i - 1]),
+            (2, i) => dac_data = Some(VREF.v5[i - 1]),
+            (3, i) => dac_data = Some(VREF.v10[i - 1]),
+            (4, i) => dac_data = Some(VREF.v15[i - 1]),
+            (_, _) => dac_data = None,
         }
+
+        if dac_data.is_some() {
+            dac.set_dac_fast(PowerDown::Normal, dac_data.unwrap()).ok();
+        }
+
+        screen_loop(&mut screen, voltage_mode, current_mode, text);
     }
 }
 
@@ -248,4 +254,78 @@ struct VoltageReference {
     v10: [u16; 10],
     v5: [u16; 10],
     v1: [u16; 10],
+}
+
+fn screen_loop(
+    screen: &mut Ssd1306<
+        ssd1306::prelude::I2CInterface<
+            bitbang_hal::i2c::I2cBB<
+                stm32f1xx_hal::gpio::Pin<
+                    'A',
+                    6,
+                    stm32f1xx_hal::gpio::Output<stm32f1xx_hal::gpio::OpenDrain>,
+                >,
+                stm32f1xx_hal::gpio::Pin<
+                    'A',
+                    7,
+                    stm32f1xx_hal::gpio::Output<stm32f1xx_hal::gpio::OpenDrain>,
+                >,
+                stm32f1xx_hal::timer::CounterHz<pac::TIM3>,
+            >,
+        >,
+        DisplaySize128x64,
+        ssd1306::mode::BufferedGraphicsMode<DisplaySize128x64>,
+    >,
+    v: u8,
+    i: usize,
+    text: embedded_graphics::mono_font::MonoTextStyle<'_, BinaryColor>,
+) {
+    screen.clear_buffer();
+    Line::new(Point::new(0, 45), Point::new(128, 45))
+        .into_styled(PrimitiveStyle::with_stroke(BinaryColor::On, 1))
+        .draw(screen)
+        .ok();
+    Text::with_baseline("V=  V", Point::new(0, 50), text, Baseline::Top)
+        .draw(screen)
+        .ok();
+    Text::with_baseline("I=   A", Point::new(92, 50), text, Baseline::Top)
+        .draw(screen)
+        .ok();
+    Text::with_baseline(
+        match v {
+            0 => "xx",
+            1 => "01",
+            2 => "05",
+            3 => "10",
+            4 => "15",
+            _ => "??",
+        },
+        Point::new(12, 50),
+        text,
+        Baseline::Top,
+    )
+    .draw(screen)
+    .ok();
+    Text::with_baseline(
+        match i {
+            0 => "xxx",
+            1 => "0.2",
+            2 => "0.4",
+            3 => "0.6",
+            4 => "0.8",
+            5 => "1.0",
+            6 => "1.2",
+            7 => "1.4",
+            8 => "1.6",
+            9 => "1.8",
+            10 => "2.0",
+            _ => "???",
+        },
+        Point::new(104, 50),
+        text,
+        Baseline::Top,
+    )
+    .draw(screen)
+    .ok();
+    screen.flush().ok();
 }
