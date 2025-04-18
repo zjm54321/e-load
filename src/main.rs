@@ -336,7 +336,7 @@ fn screen_loop(
     .ok();
 
     if (v!= 0) && (i != 0) {
-        Text::with_baseline("Output", Point::new(46, 25), text, Baseline::Top)
+        Text::with_baseline("Working", Point::new(46, 25), text, Baseline::Top)
         .draw(screen)
         .ok();
     } else {
