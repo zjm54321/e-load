@@ -10,7 +10,7 @@ use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch
 
 use cortex_m_rt::entry;
 
-#[cfg(debug_assertions)]
+#[cfg(feature= "semihosting")]
 use cortex_m_semihosting::hprintln;
 
 use stm32f1xx_hal::{
@@ -54,7 +54,7 @@ fn main() -> ! {
     let mut afio = dp.AFIO.constrain();
 
     led.set_high(); //系统配置加载完毕。
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "semihosting")]
     hprintln!("sys init finished");
 
     delay.delay(1.secs()); //等待外设准备就绪
@@ -79,7 +79,7 @@ fn main() -> ! {
     led.set_low(); //屏幕加载完毕
     screen.clear().ok();
     write!(screen, "Screen Init Finished.\n").ok();
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "semihosting")]
     hprintln!("ssd1306 init finished");
 
     // 设置 mcp4725 ，使用硬件i2c(pb6,pb7)
@@ -203,22 +203,22 @@ fn main() -> ! {
                 dac.set_dac_fast(PowerDown::Normal, 0x0000).ok();
             }
             (1, i) => {
-                #[cfg(feature = "dbg")]
+                #[cfg(feature = "semihosting")]
                 hprintln!("{}",VREF.v15[i]);
                 dac.set_dac_fast(PowerDown::Normal, VREF.v15[i]).ok();
             }
             (2, i) => {
-                #[cfg(feature = "dbg")]
+                #[cfg(feature = "semihosting")]
                 hprintln!("{}",VREF.v10[i]);
                 dac.set_dac_fast(PowerDown::Normal, VREF.v10[i]).ok();
             }
             (3, i) => {
-                #[cfg(feature = "dbg")]
+                #[cfg(feature = "semihosting")]
                 hprintln!("{}",VREF.v5[i]);
                 dac.set_dac_fast(PowerDown::Normal, VREF.v5[i]).ok();
             }
             (4, i) => {
-                #[cfg(feature = "dbg")]
+                #[cfg(feature = "semihosting")]
                 hprintln!("{}",VREF.v1[i]);
                 dac.set_dac_fast(PowerDown::Normal, VREF.v1[i]).ok();
             }

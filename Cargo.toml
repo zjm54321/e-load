@@ -27,7 +27,7 @@ version = "0.10.0"
 features = ["rt","stm32f103","medium"]
 
 [features]
-dbg = []
+semihosting = []
 
 # this lets you use `cargo fix`!
 [[bin]]
